@@ -1,59 +1,37 @@
 import streamlit as st
 import pandas as pd
 
-# Função para análise de preenchimento
-def AnalisePreenchimento(df_bd, df_matriz):
-    resultado = []
+st.title('Verificação de inconsistências lógicas em banco de dados')
 
-    for coluna in range(1, len(df_matriz.columns)):  # Itera sobre as colunas da matriz
-        texto = df_matriz.columns[coluna]  # Obtém o nome da coluna na matriz
-        regra = df_matriz.iloc[4, coluna]  # Obtém a regra correspondente na linha 4 da matriz
+st.write('Os códigos a seguir são uma adaptação para Python dos códigos originalmente escritos em VBA para detecção de inconsistências lógicas em bancos de dados de pesquisas cadastrais.')
+st.write('Bibliotecas utilizadas: pandas, openpyxl')
 
-        if texto in df_bd.columns:
-            for linha in range(len(df_bd)):
-                valor_celula = df_bd.loc[linha, texto]
+uploaded_file1 = st.file_uploader("Escolha o arquivo do Banco de Dados", type=["xlsx"])
+uploaded_file2 = st.file_uploader("Escolha o arquivo da Matriz", type=["xlsx"])
+uploaded_file3 = st.file_uploader("Escolha o arquivo dos Intervalos", type=["xlsx"])
+uploaded_file4 = st.file_uploader("Escolha o arquivo dos Nomes", type=["xlsx"])
 
-                if (regra == "OBRIGATÓRIO" and pd.isna(valor_celula)) or (regra == "VAZIO" and not pd.isna(valor_celula)):
-                    motivo = "Preenchimento obrigatório" if regra == "OBRIGATÓRIO" else "Sem preenchimento"
-                    resultado.append({
-                        'Data_Hora': pd.Timestamp.now(),
-                        'Linha': linha+1,
-                        'Coluna': texto,
-                        'Motivo': motivo,
-                        'Regra': regra,
-                    })
+if uploaded_file1 and uploaded_file2 and uploaded_file3 and uploaded_file4:
+    try:
+        # Carregar os arquivos Excel em DataFrames
+        df_bd = pd.read_excel(uploaded_file1)
+        df_matriz = pd.read_excel(uploaded_file2, header=1)
+        df_intervalos = pd.read_excel(uploaded_file3)
+        df_nomes = pd.read_excel(uploaded_file4)
 
-    resultado = pd.DataFrame(resultado)
-    return resultado
+        st.write("Banco de Dados:")
+        st.dataframe(df_bd.head())
 
-# Título do aplicativo
-st.title('Análise de Preenchimento de Dados')
+        st.write("Matriz:")
+        st.dataframe(df_matriz.head())
 
-# Upload dos arquivos Excel
-arquivo_bd = st.file_uploader('Upload do arquivo Excel do banco de dados (.xlsx)', type='xlsx')
-arquivo_matriz = st.file_uploader('Upload do arquivo Excel da matriz (.xlsx)', type='xlsx')
+        st.write("Intervalos:")
+        st.dataframe(df_intervalos.head())
 
-# Botão para iniciar análise
-if st.button('Iniciar Análise'):
+        st.write("Nomes:")
+        st.dataframe(df_nomes.head())
+    except Exception as e:
+        st.error(f"Erro ao carregar os arquivos: {e}")
+else:
+    st.write("Por favor, carregue todos os arquivos para iniciar a validação.")
 
-    if arquivo_bd is not None and arquivo_matriz is not None:
-        try:
-            # Carregar arquivos Excel para DataFrames do pandas
-            df_bd = pd.read_excel(arquivo_bd)
-            df_matriz = pd.read_excel(arquivo_matriz, header=1)
-
-            # Realizar análise de preenchimento
-            resultado_analise = AnalisePreenchimento(df_bd, df_matriz)
-
-            # Criar DataFrame com resultado da análise
-            preenchimento = pd.DataFrame(resultado_analise)
-
-            # Exibir resultado da análise
-            st.write("\nResultado da Análise:")
-            st.write(preenchimento.head())  # Exibir os primeiros registros do DataFrame de preenchimento
-
-        except Exception as e:
-            st.warning(f"Erro ao processar os arquivos: {e}")
-
-    else:
-        st.warning("Por favor, faça o upload de ambos os arquivos para iniciar a análise.")
