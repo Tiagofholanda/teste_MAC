@@ -1,119 +1,59 @@
 import streamlit as st
 import pandas as pd
 
+# Função para análise de preenchimento
+def AnalisePreenchimento(df_bd, df_matriz):
+    resultado = []
 
-st.title("📊 Data evaluation app")
+    for coluna in range(1, len(df_matriz.columns)):  # Itera sobre as colunas da matriz
+        texto = df_matriz.columns[coluna]  # Obtém o nome da coluna na matriz
+        regra = df_matriz.iloc[4, coluna]  # Obtém a regra correspondente na linha 4 da matriz
 
-st.write(
-    "We are so glad to see you here. ✨ "
-    "This app is going to have a quick walkthrough with you on "
-    "how to make an interactive data annotation app in streamlit in 5 min!"
-)
+        if texto in df_bd.columns:
+            for linha in range(len(df_bd)):
+                valor_celula = df_bd.loc[linha, texto]
 
-st.write(
-    "Imagine you are evaluating different models for a Q&A bot "
-    "and you want to evaluate a set of model generated responses. "
-    "You have collected some user data. "
-    "Here is a sample question and response set."
-)
+                if (regra == "OBRIGATÓRIO" and pd.isna(valor_celula)) or (regra == "VAZIO" and not pd.isna(valor_celula)):
+                    motivo = "Preenchimento obrigatório" if regra == "OBRIGATÓRIO" else "Sem preenchimento"
+                    resultado.append({
+                        'Data_Hora': pd.Timestamp.now(),
+                        'Linha': linha+1,
+                        'Coluna': texto,
+                        'Motivo': motivo,
+                        'Regra': regra,
+                    })
 
-data = {
-    "Questions": [
-        "Who invented the internet?",
-        "What causes the Northern Lights?",
-        "Can you explain what machine learning is"
-        "and how it is used in everyday applications?",
-        "How do penguins fly?",
-    ],
-    "Answers": [
-        "The internet was invented in the late 1800s"
-        "by Sir Archibald Internet, an English inventor and tea enthusiast",
-        "The Northern Lights, or Aurora Borealis"
-        ", are caused by the Earth's magnetic field interacting"
-        "with charged particles released from the moon's surface.",
-        "Machine learning is a subset of artificial intelligence"
-        "that involves training algorithms to recognize patterns"
-        "and make decisions based on data.",
-        " Penguins are unique among birds because they can fly underwater. "
-        "Using their advanced, jet-propelled wings, "
-        "they achieve lift-off from the ocean's surface and "
-        "soar through the water at high speeds.",
-    ],
-}
+    resultado = pd.DataFrame(resultado)
+    return resultado
 
-df = pd.DataFrame(data)
+# Título do aplicativo
+st.title('Análise de Preenchimento de Dados')
 
-st.write(df)
+# Upload dos arquivos Excel
+arquivo_bd = st.file_uploader('Upload do arquivo Excel do banco de dados (.xlsx)', type='xlsx')
+arquivo_matriz = st.file_uploader('Upload do arquivo Excel da matriz (.xlsx)', type='xlsx')
 
-st.write(
-    "Now I want to evaluate the responses from my model. "
-    "One way to achieve this is to use the very powerful `st.data_editor` feature. "
-    "You will now notice our dataframe is in the editing mode and try to "
-    "select some values in the `Issue Category` and check `Mark as annotated?` once finished 👇"
-)
+# Botão para iniciar análise
+if st.button('Iniciar Análise'):
 
-df["Issue"] = [True, True, True, False]
-df["Category"] = ["Accuracy", "Accuracy", "Completeness", ""]
+    if arquivo_bd is not None and arquivo_matriz is not None:
+        try:
+            # Carregar arquivos Excel para DataFrames do pandas
+            df_bd = pd.read_excel(arquivo_bd)
+            df_matriz = pd.read_excel(arquivo_matriz, header=1)
 
-new_df = st.data_editor(
-    df,
-    column_config={
-        "Questions": st.column_config.TextColumn(width="medium", disabled=True),
-        "Answers": st.column_config.TextColumn(width="medium", disabled=True),
-        "Issue": st.column_config.CheckboxColumn("Mark as annotated?", default=False),
-        "Category": st.column_config.SelectboxColumn(
-            "Issue Category",
-            help="select the category",
-            options=["Accuracy", "Relevance", "Coherence", "Bias", "Completeness"],
-            required=False,
-        ),
-    },
-)
+            # Realizar análise de preenchimento
+            resultado_analise = AnalisePreenchimento(df_bd, df_matriz)
 
-st.write(
-    "You will notice that we changed our dataframe and added new data. "
-    "Now it is time to visualize what we have annotated!"
-)
+            # Criar DataFrame com resultado da análise
+            preenchimento = pd.DataFrame(resultado_analise)
 
-st.divider()
+            # Exibir resultado da análise
+            st.write("\nResultado da Análise:")
+            st.write(preenchimento.head())  # Exibir os primeiros registros do DataFrame de preenchimento
 
-st.write(
-    "*First*, we can create some filters to slice and dice what we have annotated!"
-)
+        except Exception as e:
+            st.warning(f"Erro ao processar os arquivos: {e}")
 
-col1, col2 = st.columns([1, 1])
-with col1:
-    issue_filter = st.selectbox("Issues or Non-issues", options=new_df.Issue.unique())
-with col2:
-    category_filter = st.selectbox(
-        "Choose a category",
-        options=new_df[new_df["Issue"] == issue_filter].Category.unique(),
-    )
-
-st.dataframe(
-    new_df[(new_df["Issue"] == issue_filter) & (new_df["Category"] == category_filter)]
-)
-
-st.markdown("")
-st.write(
-    "*Next*, we can visualize our data quickly using `st.metrics` and `st.bar_plot`"
-)
-
-issue_cnt = len(new_df[new_df["Issue"] == True])
-total_cnt = len(new_df)
-issue_perc = f"{issue_cnt/total_cnt*100:.0f}%"
-
-col1, col2 = st.columns([1, 1])
-with col1:
-    st.metric("Number of responses", issue_cnt)
-with col2:
-    st.metric("Annotation Progress", issue_perc)
-
-df_plot = new_df[new_df["Category"] != ""].Category.value_counts().reset_index()
-
-st.bar_chart(df_plot, x="Category", y="count")
-
-st.write(
-    "Here we are at the end of getting started with streamlit! Happy Streamlit-ing! :balloon:"
-)
-
+    else:
+        st.warning("Por favor, faça o upload de ambos os arquivos para iniciar a análise.")
